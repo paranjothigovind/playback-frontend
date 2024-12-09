@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import './AudioSplitter.css'; // Importing a CSS file for styling
+import React, { useState } from "react";
+import axios from "axios";
+import "./AudioSplitter.css";
+import { LAMBDA_URL } from "./constants";
 
 const AudioSplitter = () => {
   const [file, setFile] = useState(null);
-  const [uploadMessage, setUploadMessage] = useState('');
+  const [uploadMessage, setUploadMessage] = useState("");
   const [splitParts, setSplitParts] = useState([]);
 
   const handleFileChange = (e) => {
@@ -18,20 +19,18 @@ const AudioSplitter = () => {
     }
 
     const getPresignedUrl = async () => {
-      const response = await axios.get("https://y34iz73hpe.execute-api.ap-south-1.amazonaws.com/");
-      return response.data.url;
-    }
+      const response = await axios.get(LAMBDA_URL);
+      return response.data.upload_url;
+    };
 
-    // Step 1: Upload file to S3
-    const s3UploadUrl = await getPresignedUrl(); // Obtain from backend
+    const s3UploadUrl = await getPresignedUrl();
     await axios.put(s3UploadUrl, file, {
       headers: { "Content-Type": file.type },
     });
 
-    const objectKey = file.name; // Adjust based on the S3 key
+    const objectKey = file.name;
 
-    // Step 2: Call API Gateway to invoke Lambda
-    const apiGatewayUrl = "https://y34iz73hpe.execute-api.ap-south-1.amazonaws.com/";
+    const apiGatewayUrl = LAMBDA_URL;
     const response = await axios.post(apiGatewayUrl, {
       bucket_name: "my-audio-app-bucket",
       object_key: objectKey,
@@ -39,8 +38,8 @@ const AudioSplitter = () => {
 
     if (response.status === 200) {
       setSplitParts([
-        `https://my-audio-app-bucket.s3.amazonaws.com/${response.data.part1_key}`,
-        `https://my-audio-app-bucket.s3.amazonaws.com/${response.data.part2_key}`,
+        `${LAMBDA_URL}/${response.data.part1_key}`,
+        `${LAMBDA_URL}/${response.data.part2_key}`,
       ]);
       setUploadMessage("Audio split successfully!");
     } else {
@@ -51,18 +50,15 @@ const AudioSplitter = () => {
   return (
     <div className="audio-splitter-container">
       <h1 className="title">Playback App</h1>
-      <div className='upload-container'>
-      <input 
-        type="file" 
-        accept="audio/*" 
-        onChange={handleFileChange} 
-        className="file-input" 
-      />
+      <div className="upload-container">
+        <input
+          type="file"
+          accept="audio/*"
+          onChange={handleFileChange}
+          className="file-input"
+        />
       </div>
-      <button 
-        onClick={handleUploadAndSplit} 
-        className="upload-button"
-      >
+      <button onClick={handleUploadAndSplit} className="upload-button">
         Upload and Split
       </button>
 
