@@ -7,9 +7,47 @@ const AudioSplitter = () => {
   const [file, setFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
   const [splitParts, setSplitParts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+    if (selectedFile && selectedFile.type.startsWith("audio/")) {
+      setFile(selectedFile);
+      setUploadMessage("");
+    } else {
+      setUploadMessage("Please select a valid audio file.");
+    }
+  };
+
+  const getPresignedUrl = async () => {
+    try {
+      const response = await axios.get(`${LAMBDA_URL}/prod/presigned-url`);
+      return response.data.upload_url;
+    } catch (error) {
+      throw new Error("Failed to fetch presigned URL.");
+    }
+  };
+
+  const uploadToS3 = async (url, file) => {
+    try {
+      await axios.put(url, file, {
+        headers: { "Content-Type": file.type },
+      });
+    } catch (error) {
+      throw new Error("Failed to upload file to S3.");
+    }
+  };
+
+  const splitAudio = async (objectKey) => {
+    try {
+      const response = await axios.post(LAMBDA_URL, {
+        bucket_name: "my-audio-app-bucket",
+        object_key: objectKey,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error("Failed to split audio.");
+    }
   };
 
   const handleUploadAndSplit = async () => {
@@ -18,32 +56,23 @@ const AudioSplitter = () => {
       return;
     }
 
-    const getPresignedUrl = async () => {
-      const response = await axios.get(LAMBDA_URL);
-      return response.data.upload_url;
-    };
+    setIsLoading(true);
+    setUploadMessage("");
 
-    const s3UploadUrl = await getPresignedUrl();
-    await axios.put(s3UploadUrl, file, {
-      headers: { "Content-Type": file.type },
-    });
+    try {
+      const s3UploadUrl = await getPresignedUrl();
+      await uploadToS3(s3UploadUrl, file);
 
-    const objectKey = file.name;
-
-    const apiGatewayUrl = LAMBDA_URL;
-    const response = await axios.post(apiGatewayUrl, {
-      bucket_name: "my-audio-app-bucket",
-      object_key: objectKey,
-    });
-
-    if (response.status === 200) {
+      const splitData = await splitAudio(file.name);
       setSplitParts([
-        `${LAMBDA_URL}/${response.data.part1_key}`,
-        `${LAMBDA_URL}/${response.data.part2_key}`,
+        `${LAMBDA_URL}/${splitData.part1_key}`,
+        `${LAMBDA_URL}/${splitData.part2_key}`,
       ]);
       setUploadMessage("Audio split successfully!");
-    } else {
-      setUploadMessage("Failed to split audio.");
+    } catch (error) {
+      setUploadMessage(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -58,8 +87,12 @@ const AudioSplitter = () => {
           className="file-input"
         />
       </div>
-      <button onClick={handleUploadAndSplit} className="upload-button">
-        Upload and Split
+      <button
+        onClick={handleUploadAndSplit}
+        className="upload-button"
+        disabled={isLoading}
+      >
+        {isLoading ? "Processing..." : "Upload and Split"}
       </button>
 
       {uploadMessage && <p className="upload-message">{uploadMessage}</p>}
