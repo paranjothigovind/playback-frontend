@@ -1,17 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, ChangeEvent } from "react";
 import axios from "axios";
 import "./AudioSplitter.css";
-import { LAMBDA_URL } from "./constants";
+import { SERVER_URL, LAMBDA_URL } from "./constants";
 
-const AudioSplitter = () => {
-  const [file, setFile] = useState(null);
-  const [uploadMessage, setUploadMessage] = useState("");
-  const [splitParts, setSplitParts] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+const AudioSplitter: React.FC = () => {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadMessage, setUploadMessage] = useState<string>("");
+  const [splitParts, setSplitParts] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile && selectedFile.type.startsWith("audio/")) {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
       setFile(selectedFile);
       setUploadMessage("");
     } else {
@@ -19,29 +19,36 @@ const AudioSplitter = () => {
     }
   };
 
-  const getPresignedUrl = async () => {
+  const getPresignedUrl = async (params: {
+    file_name: string;
+    bucket_name: string;
+    content_type: string;
+    expires: number;
+  } ): Promise<string> => {
     try {
-      const response = await axios.get(`${LAMBDA_URL}/prod/presigned-url`);
-      return response.data.upload_url;
+      const response = await axios.get(`${SERVER_URL}/presigned-url`, { params });
+      return response.data.url;
     } catch (error) {
       throw new Error("Failed to fetch presigned URL.");
     }
   };
 
-  const uploadToS3 = async (url, file) => {
+  const uploadToS3 = async (url: string, file: File) => {
     try {
-      await axios.put(url, file, {
-        headers: { "Content-Type": file.type },
-      });
-    } catch (error) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("Content-Type", file.type);
+      await axios.put(url, formData);
+    } catch (error: any) {
+      console.error(error.response.data);
       throw new Error("Failed to upload file to S3.");
     }
   };
 
-  const splitAudio = async (objectKey) => {
+  const splitAudio = async (objectKey: string) => {
     try {
-      const response = await axios.post(LAMBDA_URL, {
-        bucket_name: "my-audio-app-bucket",
+      const response = await axios.post(`${LAMBDA_URL}/split-audio`, {
+        bucket_name: "awsbackendstack-audiobucket96beecba-mism2ey05iin",
         object_key: objectKey,
       });
       return response.data;
@@ -56,11 +63,22 @@ const AudioSplitter = () => {
       return;
     }
 
+    const {
+      name,
+      type,
+      size,
+    } = file;
+
     setIsLoading(true);
     setUploadMessage("");
 
     try {
-      const s3UploadUrl = await getPresignedUrl();
+      const s3UploadUrl = await getPresignedUrl({
+        file_name: name,
+        bucket_name: "awsbackendstack-audiobucket96beecba-mism2ey05iin",
+        content_type: type,
+        expires: 3600,
+      });
       await uploadToS3(s3UploadUrl, file);
 
       const splitData = await splitAudio(file.name);
@@ -69,7 +87,7 @@ const AudioSplitter = () => {
         `${LAMBDA_URL}/${splitData.part2_key}`,
       ]);
       setUploadMessage("Audio split successfully!");
-    } catch (error) {
+    } catch (error: any) {
       setUploadMessage(error.message);
     } finally {
       setIsLoading(false);
@@ -82,7 +100,7 @@ const AudioSplitter = () => {
       <div className="upload-container">
         <input
           type="file"
-          accept="audio/*"
+          accept=""
           onChange={handleFileChange}
           className="file-input"
         />
