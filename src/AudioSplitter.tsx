@@ -26,7 +26,7 @@ const AudioSplitter: React.FC = () => {
     expires: number;
   } ): Promise<string> => {
     try {
-      const response = await axios.get(`${SERVER_URL}/presigned-url`, { params });
+      const response = await axios.get(`https://hhuodfrkae.execute-api.us-east-1.amazonaws.com/prod/presigned-url`, { params });
       return response.data.url;
     } catch (error) {
       throw new Error("Failed to fetch presigned URL.");
@@ -47,7 +47,7 @@ const AudioSplitter: React.FC = () => {
 
   const splitAudio = async (objectKey: string) => {
     try {
-      const response = await axios.post(`${LAMBDA_URL}/split-audio`, {
+      const response = await axios.post(`https://kengrn22kg.execute-api.us-east-1.amazonaws.com/prod/split-audio`, {
         bucket_name: "awsbackendstack-audiobucket96beecba-mism2ey05iin",
         object_key: objectKey,
       });
@@ -76,10 +76,11 @@ const AudioSplitter: React.FC = () => {
       const s3UploadUrl = await getPresignedUrl({
         file_name: name,
         bucket_name: "awsbackendstack-audiobucket96beecba-mism2ey05iin",
-        content_type: type,
+        content_type: "multipart/form-data; boundary=--------------------------6871592873333212137973631733937317",
         expires: 3600,
       });
-      await uploadToS3(s3UploadUrl, file);
+      const response = await uploadToS3(s3UploadUrl, file);
+console.log(response);
 
       const splitData = await splitAudio(file.name);
       setSplitParts([
