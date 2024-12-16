@@ -1,7 +1,7 @@
 import React, { useState, ChangeEvent } from "react";
 import axios from "axios";
 import "./AudioSplitter.css";
-import { SERVER_URL, LAMBDA_URL } from "./constants";
+import { SERVER_URL, LAMBDA_URL, BUCKET_NAME } from "./constants";
 
 const AudioSplitter: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -24,9 +24,11 @@ const AudioSplitter: React.FC = () => {
     bucket_name: string;
     content_type: string;
     expires: number;
-  } ): Promise<string> => {
+  }): Promise<string> => {
     try {
-      const response = await axios.get(`https://hhuodfrkae.execute-api.us-east-1.amazonaws.com/prod/presigned-url`, { params });
+      const response = await axios.get(`${LAMBDA_URL}/prod/presigned-url`, {
+        params,
+      });
       return response.data.url;
     } catch (error) {
       throw new Error("Failed to fetch presigned URL.");
@@ -47,8 +49,8 @@ const AudioSplitter: React.FC = () => {
 
   const splitAudio = async (objectKey: string) => {
     try {
-      const response = await axios.post(`https://kengrn22kg.execute-api.us-east-1.amazonaws.com/prod/split-audio`, {
-        bucket_name: "awsbackendstack-audiobucket96beecba-mism2ey05iin",
+      const response = await axios.post(`${SERVER_URL}/prod/split-audio`, {
+        bucket_name: BUCKET_NAME,
         object_key: objectKey,
       });
       return response.data;
@@ -63,11 +65,7 @@ const AudioSplitter: React.FC = () => {
       return;
     }
 
-    const {
-      name,
-      type,
-      size,
-    } = file;
+    const { name, type, size } = file;
 
     setIsLoading(true);
     setUploadMessage("");
@@ -75,12 +73,12 @@ const AudioSplitter: React.FC = () => {
     try {
       const s3UploadUrl = await getPresignedUrl({
         file_name: name,
-        bucket_name: "awsbackendstack-audiobucket96beecba-mism2ey05iin",
-        content_type: "multipart/form-data; boundary=--------------------------6871592873333212137973631733937317",
+        bucket_name: BUCKET_NAME,
+        content_type: "multipart/form-data",
         expires: 3600,
       });
       const response = await uploadToS3(s3UploadUrl, file);
-console.log(response);
+      console.log(response);
 
       const splitData = await splitAudio(file.name);
       setSplitParts([
