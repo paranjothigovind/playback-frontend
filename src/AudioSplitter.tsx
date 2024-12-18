@@ -2,6 +2,7 @@ import React, { useState, ChangeEvent } from "react";
 import axios from "axios";
 import "./AudioSplitter.css";
 import { SERVER_URL, LAMBDA_URL, BUCKET_NAME } from "./constants";
+import AudioPlayer from "./AudioPlayer";
 
 const AudioSplitter: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -49,10 +50,7 @@ const AudioSplitter: React.FC = () => {
 
   const splitAudio = async (objectKey: string) => {
     try {
-      const response = await axios.post(`${SERVER_URL}/prod/split-audio`, {
-        bucket_name: BUCKET_NAME,
-        object_key: objectKey,
-      });
+      const response = await axios.get(`${LAMBDA_URL}/prod/split-audio?key=${objectKey}&bucket_name=${BUCKET_NAME}`);
       return response.data;
     } catch (error) {
       throw new Error("Failed to split audio.");
@@ -60,7 +58,7 @@ const AudioSplitter: React.FC = () => {
   };
 
   const handleUploadAndSplit = async () => {
-    if (!file) {
+    if (!file) { 
       alert("Please select a file first.");
       return;
     }
@@ -81,9 +79,16 @@ const AudioSplitter: React.FC = () => {
       console.log(response);
 
       const splitData = await splitAudio(file.name);
+      console.log(splitData);
+
+      const {files} = splitData.response;
+      console.log(   `https://${BUCKET_NAME}.s3.us-east-1.amazonaws.com/${files[0]}`,
+        `https://${BUCKET_NAME}.s3.us-east-1.amazonaws.com/${files[1]}`,);
+      
+      
       setSplitParts([
-        `${LAMBDA_URL}/${splitData.part1_key}`,
-        `${LAMBDA_URL}/${splitData.part2_key}`,
+        `https://${BUCKET_NAME}.s3.us-east-1.amazonaws.com/${files[0]}`,
+        `https://${BUCKET_NAME}.s3.us-east-1.amazonaws.com/${files[1]}`,
       ]);
       setUploadMessage("Audio split successfully!");
     } catch (error: any) {
