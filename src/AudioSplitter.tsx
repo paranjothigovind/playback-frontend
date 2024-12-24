@@ -1,8 +1,7 @@
 import React, { useState, ChangeEvent } from "react";
 import axios from "axios";
 import "./AudioSplitter.css";
-import { SERVER_URL, LAMBDA_URL, BUCKET_NAME } from "./constants";
-import AudioPlayer from "./AudioPlayer";
+import { LAMBDA_URL, BUCKET_NAME } from "./constants";
 
 const AudioSplitter: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -63,7 +62,7 @@ const AudioSplitter: React.FC = () => {
       return;
     }
 
-    const { name, type, size } = file;
+    const { name } = file;
 
     setIsLoading(true);
     setUploadMessage("");
